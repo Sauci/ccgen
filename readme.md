@@ -43,16 +43,3 @@ Crank/cam signal generation
 1. ccgen shall be able to generate a missing tooth on one or several cam teeth. 
 2. ccgen shall be able to generate timing issues (longer or short durations than configured) on one or several crank teeth.
 
-## Algorithms
-
-### Speed
-
-$$ v = \frac{D \cdot \alpha \cdot 8 \cdot 240'000'000}{t \cdot 36'000} $$
-
-* v [rpm] : s32, bin3
-* D [-] : 1 if normal direction, -1 if inverted
-* t [us] : u32, bin2
-* $\alpha$ [°/100] : u32, dec2
-
-## Timer configuration
-
