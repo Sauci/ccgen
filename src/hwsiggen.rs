@@ -121,7 +121,7 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         self.prescaler = if psc > 0xFFFF {
             0xFFFF as u16
         } else {
-            self.prescaler as u16
+            psc as u16
         };
         set_tim_psc(tim_crk, self.prescaler);
         set_tim_psc(tim_cam, self.prescaler);

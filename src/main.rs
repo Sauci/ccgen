@@ -19,7 +19,7 @@ use hwsiggen::Timer;
 
 
 
-static mut GEN_TIM: Timer = Timer::new(32_000_000);
+static mut GEN_TIM: Timer = Timer::new(36_000_000);
 
 #[interrupt]
 fn TIM2() {
@@ -45,7 +45,7 @@ fn main() -> ! {
         
         let tim = unsafe { &mut GEN_TIM };
         tim.initialize(cam_gen, crk_gen);
-        tim.set_speed_rpm(100);
+        tim.set_speed_rpm(1000);
         tim.start();
     }
 

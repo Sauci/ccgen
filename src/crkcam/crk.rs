@@ -65,19 +65,10 @@ impl CrkWheel {
     pub fn teeth_nr(&self) -> u8 {
         self.cfg.tooth_nr
     }
-
-    pub fn missing_teeth_nr(&self) -> u8 {
-        self.cfg.miss_tooth_nr
-    }
-
-    pub fn tooth_angle(&self) -> u32 {
-        REV_ANGLE / self.cfg.tooth_nr as u32
-    }
 }
 
 pub struct CrkSigGen {
     gen_pos: usize,
-    norm_dir: bool,
     crk: Option<CrkWheel>,
 }
 
@@ -85,7 +76,6 @@ impl CrkSigGen {
     pub const fn new() -> CrkSigGen {
         CrkSigGen {
             gen_pos: 0,
-            norm_dir: true,
             crk: None,
         }
     }
@@ -93,10 +83,6 @@ impl CrkSigGen {
     pub fn set_crk(&mut self, cfg: &'static CrkCfg) {
         self.gen_pos = 0;
         self.crk = Some(CrkWheel::new(cfg));
-    }
-
-    pub fn set_dir(&mut self, norm_dir: bool) {
-        self.norm_dir = norm_dir;
     }
 }
 

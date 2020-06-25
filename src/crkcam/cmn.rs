@@ -10,11 +10,6 @@ pub fn ti_ag_to_spd(ag: u32, ti: u32) -> u32 {
     ((ag as u64 * 60_000_000) / (ti as u64 * 36_000)) as u32
 }
 
-pub enum Level {
-    High,
-    Low,
-}
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Edge {
     Falling,
@@ -32,7 +27,6 @@ impl core::ops::Not for Edge {
     }
 }
 
-pub const CYCLE_ANGLE: u32 = 72000;
 pub const REV_ANGLE: u32 = 36_000;
 
 #[derive(Debug, Copy, Clone)]
