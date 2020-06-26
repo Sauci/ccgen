@@ -139,6 +139,7 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         // Load next event
         tim_crk.arr.write(|w| w.arr().bits(self.crk_arr));
         tim_crk.ccr1.write(|w| w.ccr().bits(self.crk_arr));
+        tim_crk.egr.modify(|_, w| w.ug().update());
 
         if ev_ag.is_gen {
             match ev_ag.edge {
@@ -172,6 +173,7 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         // Load next event
         tim_cam.arr.write(|w| w.arr().bits(self.cam_arr));
         tim_cam.ccr1.write(|w| w.ccr().bits(self.cam_arr));
+        tim_cam.egr.modify(|_, w| w.ug().update());
 
         match ev_ag.edge {
             Edge::Rising => tim_cam
