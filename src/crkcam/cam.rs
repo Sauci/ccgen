@@ -37,10 +37,12 @@ impl CamWheel {
         cam.cfg.ev_ag.iter().enumerate().for_each(|(idx, ag)| {
             let ev = AgEv {
                 ag: *ag,
-                edge: if idx % 2 == 0 {
-                    !cam.cfg.mai_edge
-                } else {
-                    cam.cfg.mai_edge
+                edge: {
+                    if idx % 2 == 0 {
+                        !cam.cfg.mai_edge
+                    } else {
+                        cam.cfg.mai_edge
+                    }
                 },
                 is_gen: true,
             };
@@ -54,7 +56,6 @@ impl CamWheel {
 
 pub struct CamSigGen {
     gen_pos: usize,
-    speed: u32,
     norm_dir: bool,
     wheel: Option<CamWheel>,
 }
@@ -63,14 +64,9 @@ impl CamSigGen {
     pub const fn new() -> CamSigGen {
         CamSigGen {
             gen_pos: 0,
-            speed: 0,
             norm_dir: true,
             wheel: None,
         }
-    }
-
-    pub fn set_dir(&mut self, norm_dir: bool) {
-        self.norm_dir = norm_dir;
     }
 
     pub fn set_cam(&mut self, cam: &'static CamCfg) {
@@ -86,18 +82,17 @@ impl Iterator for CamSigGen {
             let cam = self.wheel.as_ref().unwrap();
             let ev = cam.ev[self.gen_pos];
             if self.norm_dir {
+                self.gen_pos += 1;
+                if self.gen_pos >= cam.cfg.ev_nr {
+                    self.gen_pos = 0;
+                }
+            } else {
                 if self.gen_pos == 0 {
                     self.gen_pos = cam.cfg.ev_nr - 1;
                 } else {
                     self.gen_pos -= 1;
                 }
-            } else {
-                self.gen_pos += 1;
-                if self.gen_pos >= cam.cfg.ev_nr {
-                    self.gen_pos = 0;
-                }
             }
-
             Some(ev)
         } else {
             None

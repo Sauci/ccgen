@@ -16,11 +16,15 @@ pub fn init_clks() {
         // configure AHB speed to system clock
         // configure APB2 speed to system clock
         // configure APB1 speed to half the system clock
-        rcc.cfgr
-            .modify(|_, w| w.hpre().div1().ppre2().div1().ppre1().div2());
+        rcc.cfgr.modify(|_, w| 
+            w.hpre().div1()
+             .ppre2().div1()
+             .ppre1().div2()
+        );
 
         // configure pll
-        // The external crystal is a 8MHz one. To obtain 72MHz, the max, multiply by 9.
+        // The external crystal is a 8MHz one. 
+        // To obtain 72MHz, the max, multiply by 9.
         // Multiply by 9
         rcc.cfgr.modify(|_, w| w.pllmul().bits(7));
         // Disable the hse-2-pll clock dividing

@@ -46,7 +46,7 @@ fn clr_ti_irq_flg(tim: &stm32f1::stm32f103::tim2::RegisterBlock) {
 fn init_timer(tim: &stm32f1::stm32f103::tim2::RegisterBlock) {
     tim.cr1.modify(|_, w| {
         w.ckd().div1()
-         .arpe().enabled()
+         .arpe().disabled()
          .cms().edge_aligned()
          .dir().up()
          .opm().disabled()
@@ -58,7 +58,7 @@ fn init_timer(tim: &stm32f1::stm32f103::tim2::RegisterBlock) {
 }
 
 fn init_gpio() {
-    //A0 -> TIM2_CH1 and B0 -> TIM3_CH3, no remap needed
+    //A0 -> TIM2_CH1 and A6 -> TIM3_CH1, no remap needed
     let rcc = periph!(RCC);
     let pa = periph!(GPIOA);
 
@@ -116,8 +116,7 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         let tim_cam = periph!(TIM3);
 
         self.speed = spd;
-        let psc =
-            ((self.speed as u64) * (self.freq as u64) / (60 * CRK_CAM_AUTORELOAD as u64)) as u64;
+        let psc = (60_000 / spd) - 1;
         self.prescaler = if psc > 0xFFFF {
             0xFFFF as u16
         } else {
@@ -130,8 +129,7 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
     fn set_next_crk_ev(&mut self) {
         let tim_crk = periph!(TIM2);
         let ev_ag = self.crk.as_mut().unwrap().next().unwrap();
-        self.crk_arr = spd_ag_to_ti(self.speed, ev_ag.ag);
-
+        self.crk_arr = ev_ag.ag as u16;
         // Disable timer counter
         tim_crk.cr1.modify(|_, w| w.cen().disabled());
 
@@ -146,10 +144,10 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
             match ev_ag.edge {
                 Edge::Rising => tim_crk
                     .ccmr1_output_mut()
-                    .modify(|_, w| w.oc1m().force_active()),
+                    .modify(|_, w| w.oc1m().active_on_match()),
                 Edge::Falling => tim_crk
                     .ccmr1_output_mut()
-                    .modify(|_, w| w.oc1m().force_inactive()),
+                    .modify(|_, w| w.oc1m().inactive_on_match()),
             }
         } else {
             tim_crk
@@ -164,8 +162,7 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
     fn set_next_cam_ev(&mut self) {
         let tim_cam = periph!(TIM3);
         let ev_ag = self.cam.as_mut().unwrap().next().unwrap();
-        self.cam_arr = spd_ag_to_ti(self.speed, ev_ag.ag);
-
+        self.cam_arr = ev_ag.ag as u16;
         // Disable timer counter
         tim_cam.cr1.modify(|_, w| w.cen().disabled());
 
@@ -179,10 +176,10 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         match ev_ag.edge {
             Edge::Rising => tim_cam
                 .ccmr1_output_mut()
-                .modify(|_, w| w.oc1m().force_active()),
+                .modify(|_, w| w.oc1m().active_on_match()),
             Edge::Falling => tim_cam
                 .ccmr1_output_mut()
-                .modify(|_, w| w.oc1m().force_inactive()),
+                .modify(|_, w| w.oc1m().inactive_on_match()),
         }
 
         // Enable timer counter
