@@ -104,8 +104,8 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         //Init interrupts
         unsafe {
             let mut nvic = cortex_m::Peripherals::steal().NVIC;
-            nvic.set_priority(interrupt::TIM2, 6);
-            nvic.set_priority(interrupt::TIM3, 5);
+            nvic.set_priority(interrupt::TIM2, 3);
+            nvic.set_priority(interrupt::TIM3, 2);
 
             cortex_m::peripheral::NVIC::unmask(interrupt::TIM2);
             cortex_m::peripheral::NVIC::unmask(interrupt::TIM3);
@@ -117,8 +117,8 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         let tim_crk = periph!(TIM2);
         let tim_cam = periph!(TIM3);
 
-        self.speed = spd;
-        let psc = (TIM_MIN_FROM_S * (self.freq/CRK_CAM_AUTORELOAD) / spd) - 1;
+        self.speed = if spd > 0 { spd } else { 1 };
+        let psc = (TIM_MIN_FROM_S * (self.freq/CRK_CAM_AUTORELOAD) / self.speed) - 1;
         self.prescaler = if psc > 0xFFFF {
             0xFFFF as u16
         } else {
