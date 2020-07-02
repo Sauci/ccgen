@@ -13,7 +13,7 @@ mod system;
 mod periph;
 
 
-use crkcam::{cam::*, cam_cfg::*, cmn::*, crk::*, crk_cfg::*};
+use crkcam::{cam::*, cam_cfg::*, crk::*, crk_cfg::*};
 use crkcam::siggen::CrkCamSigGen;
 use hwsiggen::Timer;
 

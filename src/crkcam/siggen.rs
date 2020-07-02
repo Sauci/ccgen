@@ -1,5 +1,4 @@
 use super::cam;
-use super::cmn;
 use super::crk;
 
 pub trait CrkCamSigGen {

@@ -1,4 +1,3 @@
-use stm32f1::stm32f103::{FLASH, RCC};
 
 pub fn init_clks() {
     unsafe {

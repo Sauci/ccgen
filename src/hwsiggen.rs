@@ -1,9 +1,9 @@
 use super::crkcam::cmn::Edge;
 use super::crkcam::{self, cam::*, crk::*};
 use super::periph;
-use crate::crkcam::cmn::spd_ag_to_ti;
 
-const CRK_CAM_AUTORELOAD: u16 = 36_000;
+const CRK_CAM_AUTORELOAD: u32 = 36_000;
+const TIM_MIN_FROM_S: u32 = 60;
 
 use stm32f1::stm32f103::interrupt;
 
@@ -116,7 +116,7 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         let tim_cam = periph!(TIM3);
 
         self.speed = spd;
-        let psc = (60_000 / spd) - 1;
+        let psc = (TIM_MIN_FROM_S * (self.freq/CRK_CAM_AUTORELOAD) / spd) - 1;
         self.prescaler = if psc > 0xFFFF {
             0xFFFF as u16
         } else {
@@ -139,7 +139,7 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         // Load next event
         tim_crk.arr.write(|w| w.arr().bits(self.crk_arr));
         tim_crk.ccr1.write(|w| w.ccr().bits(self.crk_arr));
-        tim_crk.egr.modify(|_, w| w.ug().update());
+        //tim_crk.egr.modify(|_, w| w.ug().update());
 
         if ev_ag.is_gen {
             match ev_ag.edge {
@@ -173,7 +173,7 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         // Load next event
         tim_cam.arr.write(|w| w.arr().bits(self.cam_arr));
         tim_cam.ccr1.write(|w| w.ccr().bits(self.cam_arr));
-        tim_cam.egr.modify(|_, w| w.ug().update());
+        //tim_cam.egr.modify(|_, w| w.ug().update());
 
         match ev_ag.edge {
             Edge::Rising => tim_cam
