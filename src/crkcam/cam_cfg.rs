@@ -3,7 +3,7 @@ use super::cmn::*;
 
 pub const CAM_CONFIGS: [CamCfg; 1] = [CamCfg {
     ev_nr: 21,
-    mai_edge: Edge::Rising,
+    mai_edge: Edge::Falling,
     ev_ag: [
         2890, 
         1000, 

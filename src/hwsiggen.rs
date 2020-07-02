@@ -17,6 +17,8 @@ pub struct Timer {
     speed: u32,
     ///Timer clock frequency, Hz
     freq: u32,
+    cam_pin_st : bool,
+    crk_pin_st : bool,
 }
 
 impl Timer {
@@ -29,6 +31,8 @@ impl Timer {
             crk_arr: 0xFFFF,
             speed: 0,
             freq,
+            cam_pin_st: false,
+            crk_pin_st: false,
         }
     }
 }
@@ -53,8 +57,6 @@ fn init_timer(tim: &stm32f1::stm32f103::tim2::RegisterBlock) {
          .urs().counter_only()
          .udis().enabled()
     });
-
-    tim.ccer.modify(|_, w| w.cc1e().set_bit().cc1p().clear_bit());
 }
 
 fn init_gpio() {
@@ -68,9 +70,9 @@ fn init_gpio() {
     );
 
     pa.crl.modify(|_, w| 
-        w.cnf0().alt_push_pull()
+        w.cnf0().push_pull()
          .mode0().output2()
-         .cnf6().alt_push_pull()
+         .cnf6().push_pull()
          .mode6().output2()
     );
 }
@@ -128,6 +130,7 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
 
     fn set_next_crk_ev(&mut self) {
         let tim_crk = periph!(TIM2);
+        let pa = periph!(GPIOA);
         let ev_ag = self.crk.as_mut().unwrap().next().unwrap();
         self.crk_arr = ev_ag.ag as u16;
         // Disable timer counter
@@ -138,22 +141,12 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
 
         // Load next event
         tim_crk.arr.write(|w| w.arr().bits(self.crk_arr));
-        tim_crk.ccr1.write(|w| w.ccr().bits(self.crk_arr));
-        //tim_crk.egr.modify(|_, w| w.ug().update());
 
         if ev_ag.is_gen {
             match ev_ag.edge {
-                Edge::Rising => tim_crk
-                    .ccmr1_output_mut()
-                    .modify(|_, w| w.oc1m().active_on_match()),
-                Edge::Falling => tim_crk
-                    .ccmr1_output_mut()
-                    .modify(|_, w| w.oc1m().inactive_on_match()),
+                Edge::Rising => pa.bsrr.write(|w| w.bs6().set()),
+                Edge::Falling => pa.bsrr.write(|w| w.br6().reset()),
             }
-        } else {
-            tim_crk
-                .ccmr1_output_mut()
-                .modify(|_, w| w.oc1m().inactive_on_match());
         }
 
         // Enable timer counter
@@ -162,6 +155,7 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
 
     fn set_next_cam_ev(&mut self) {
         let tim_cam = periph!(TIM3);
+        let pa = periph!(GPIOA);
         let ev_ag = self.cam.as_mut().unwrap().next().unwrap();
         self.cam_arr = ev_ag.ag as u16;
         // Disable timer counter
@@ -173,15 +167,10 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         // Load next event
         tim_cam.arr.write(|w| w.arr().bits(self.cam_arr));
         tim_cam.ccr1.write(|w| w.ccr().bits(self.cam_arr));
-        //tim_cam.egr.modify(|_, w| w.ug().update());
 
         match ev_ag.edge {
-            Edge::Rising => tim_cam
-                .ccmr1_output_mut()
-                .modify(|_, w| w.oc1m().active_on_match()),
-            Edge::Falling => tim_cam
-                .ccmr1_output_mut()
-                .modify(|_, w| w.oc1m().inactive_on_match()),
+            Edge::Rising => pa.bsrr.write(|w| w.bs0().set()),
+            Edge::Falling => pa.bsrr.write(|w| w.br0().reset()),
         }
 
         // Enable timer counter
