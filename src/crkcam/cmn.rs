@@ -31,6 +31,7 @@ pub const REV_ANGLE: u32 = 36_000;
 
 #[derive(Debug, Copy, Clone)]
 pub struct AgEv {
+    pub id: u8,
     pub ag: u32,
     pub edge: Edge,
     pub is_gen: bool,

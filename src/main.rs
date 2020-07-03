@@ -11,7 +11,6 @@ mod crkcam;
 mod hwsiggen;
 mod system;
 mod periph;
-mod pot;
 
 
 use crkcam::{cam::*, cam_cfg::*, crk::*, crk_cfg::*};
@@ -35,7 +34,6 @@ fn TIM3() {
 #[entry]
 fn main() -> ! {
     system::init_clks();
-    pot::init();
     
     let tim = unsafe { &mut GEN_TIM };
     {
@@ -45,13 +43,9 @@ fn main() -> ! {
         cam_gen.set_cam(&CAM_CONFIGS[0]);
         
         tim.initialize(cam_gen, crk_gen);
-        tim.set_speed_rpm(1500);
+        tim.set_speed_rpm(1000);
         tim.start();
     }
 
-    loop {
-        let val = pot::get_val();
-        tim.set_speed_rpm(val / 2);
-        cortex_m::asm::delay(1_000_000);
-    }
+    loop {}
 }

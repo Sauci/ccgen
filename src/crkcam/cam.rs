@@ -35,6 +35,7 @@ impl CamWheel {
 
         cam.cfg.ev_ag.iter().enumerate().for_each(|(idx, ag)| {
             let ev = AgEv {
+                id: idx as u8,
                 ag: *ag,
                 edge: {
                     if idx % 2 == 0 {

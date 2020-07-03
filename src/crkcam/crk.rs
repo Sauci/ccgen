@@ -37,26 +37,25 @@ impl CrkWheel {
 
         let tmp_tooth_ag = REV_ANGLE / crk.cfg.tooth_nr as u32;
         for idx in 0..(crk.cfg.tooth_nr * 2) {
-            crk.ev
-                .push({
-                    let angle = tmp_tooth_ag / 2;
-                    let is_gen = if idx < (crk.cfg.tooth_nr - crk.cfg.miss_tooth_nr) * 2 {
-                        true
-                    } else {
-                        false
-                    };
-                    let edge = if idx % 2 == 0 {
-                        crk.cfg.mai_edge
-                    } else {
-                        !crk.cfg.mai_edge
-                    };
-                    AgEv {
-                        ag: angle,
-                        edge,
-                        is_gen,
-                    }
-                })
-                .unwrap();
+            crk.ev.push({
+                let angle = tmp_tooth_ag / 2;
+                let is_gen = if idx < (crk.cfg.miss_tooth_nr * 2) + 1 && idx > 0 {
+                    false
+                } else {
+                    true
+                };
+                let edge = if idx % 2 == 0 {
+                    crk.cfg.mai_edge
+                } else {
+                    !crk.cfg.mai_edge
+                };
+                AgEv {
+                    id: idx,
+                    ag: angle,
+                    edge,
+                    is_gen,
+                }
+            }).unwrap();
         }
 
         crk
@@ -84,6 +83,10 @@ impl CrkSigGen {
         self.gen_pos = 0;
         self.crk = Some(CrkWheel::new(cfg));
     }
+
+    pub fn reset(&mut self) {
+        self.gen_pos = 0;
+    }
 }
 
 impl Iterator for CrkSigGen {
@@ -94,7 +97,7 @@ impl Iterator for CrkSigGen {
             let crk = self.crk.as_ref().unwrap();
             let ev = crk.ev[self.gen_pos];
             self.gen_pos += 1;
-            if self.gen_pos >= crk.teeth_nr() as usize {
+            if self.gen_pos >= ((crk.teeth_nr() * 2) - 2) as usize {
                 self.gen_pos = 0;
             }
             Some(ev)
