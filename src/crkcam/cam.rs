@@ -56,21 +56,15 @@ impl CamWheel {
 
 pub struct CamSigGen {
     gen_pos: usize,
-    norm_dir: bool,
-    wheel: Option<CamWheel>,
+    cam: CamWheel,
 }
 
 impl CamSigGen {
-    pub const fn new() -> CamSigGen {
+    pub fn new(cam: &'static CamCfg) -> CamSigGen {
         CamSigGen {
             gen_pos: 0,
-            norm_dir: true,
-            wheel: None,
+            cam: CamWheel::new(cam),
         }
-    }
-
-    pub fn set_cam(&mut self, cam: &'static CamCfg) {
-        self.wheel = Some(CamWheel::new(cam));
     }
 }
 
@@ -78,24 +72,11 @@ impl Iterator for CamSigGen {
     type Item = AgEv;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.wheel.is_some() {
-            let cam = self.wheel.as_ref().unwrap();
-            let ev = cam.ev[self.gen_pos];
-            if self.norm_dir {
-                self.gen_pos += 1;
-                if self.gen_pos >= cam.cfg.ev_nr {
-                    self.gen_pos = 0;
-                }
-            } else {
-                if self.gen_pos == 0 {
-                    self.gen_pos = cam.cfg.ev_nr - 1;
-                } else {
-                    self.gen_pos -= 1;
-                }
-            }
-            Some(ev)
-        } else {
-            None
+        let ev = self.cam.ev[self.gen_pos];
+        self.gen_pos += 1;
+        if self.gen_pos >= self.cam.cfg.ev_nr {
+            self.gen_pos = 0;
         }
+        Some(ev)
     }
 }

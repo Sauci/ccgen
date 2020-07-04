@@ -68,20 +68,15 @@ impl CrkWheel {
 
 pub struct CrkSigGen {
     gen_pos: usize,
-    crk: Option<CrkWheel>,
+    crk: CrkWheel,
 }
 
 impl CrkSigGen {
-    pub const fn new() -> CrkSigGen {
+    pub fn new(cfg: &'static CrkCfg) -> CrkSigGen {
         CrkSigGen {
             gen_pos: 0,
-            crk: None,
+            crk: CrkWheel::new(cfg),
         }
-    }
-
-    pub fn set_crk(&mut self, cfg: &'static CrkCfg) {
-        self.gen_pos = 0;
-        self.crk = Some(CrkWheel::new(cfg));
     }
 
     pub fn reset(&mut self) {
@@ -93,16 +88,11 @@ impl Iterator for CrkSigGen {
     type Item = AgEv;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.crk.is_some() {
-            let crk = self.crk.as_ref().unwrap();
-            let ev = crk.ev[self.gen_pos];
-            self.gen_pos += 1;
-            if self.gen_pos >= ((crk.teeth_nr() * 2) - 2) as usize {
-                self.gen_pos = 0;
-            }
-            Some(ev)
-        } else {
-            None
+        let ev = self.crk.ev[self.gen_pos];
+        self.gen_pos += 1;
+        if self.gen_pos >= ((self.crk.teeth_nr() * 2) - 2) as usize {
+            self.gen_pos = 0;
         }
+        Some(ev)
     }
 }

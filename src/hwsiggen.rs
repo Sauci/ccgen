@@ -17,8 +17,6 @@ pub struct Timer {
     speed: u32,
     ///Timer clock frequency, Hz
     freq: u32,
-    cam_pin_st : bool,
-    crk_pin_st : bool,
 }
 
 impl Timer {
@@ -31,8 +29,6 @@ impl Timer {
             crk_arr: 0xFFFF,
             speed: 0,
             freq,
-            cam_pin_st: false,
-            crk_pin_st: false,
         }
     }
 }
@@ -40,10 +36,6 @@ impl Timer {
 fn clr_ti_irq_flg(tim: &stm32f1::stm32f103::tim2::RegisterBlock) {
     tim.sr.write(|w|
         w.uif().clear()
-        .cc1if().clear()
-        .cc2if().clear()
-        .cc3if().clear()
-        .cc4if().clear()
     );
 }
 
@@ -139,6 +131,7 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         tim_crk.cr1.modify(|_, w| w.cen().disabled());
         // Load next event
         tim_crk.arr.write(|w| w.arr().bits(self.crk_arr));
+        tim_crk.cnt.write(|w| w.cnt().bits(0));
         // Enable timer counter
         tim_crk.cr1.modify(|_, w| w.cen().enabled());
 
@@ -148,8 +141,6 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
                 Edge::Falling => pa.bsrr.write(|w| w.br6().reset()),
             }
         }
-
-        // Enable timer counter
     }
 
     fn set_next_cam_ev(&mut self) {
@@ -158,19 +149,19 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         let pa = periph!(GPIOA);
         let ev_ag = self.cam.as_mut().unwrap().next().unwrap();
         self.cam_arr = ev_ag.ag as u16;
-        if ev_ag.id == 0 {
-            tim_crk.cnt.write(|w| w.cnt().bits(0));
-            tim_cam.cnt.write(|w| w.cnt().bits(0));
-            self.crk.as_mut().unwrap().reset();
-        }
         // Disable timer counter
         tim_cam.cr1.modify(|_, w| w.cen().disabled());
-
+        if ev_ag.id == 0 {
+            tim_crk.cnt.write(|w| w.cnt().bits(0));
+            self.crk.as_mut().unwrap().reset();
+        }
+        
         // Clear interrupt flags
         clr_ti_irq_flg(tim_cam);
-
-        // Load next event
+        
+        // Load next event, clear timer
         tim_cam.arr.write(|w| w.arr().bits(self.cam_arr));
+        tim_cam.cnt.write(|w| w.cnt().bits(0));
         // Enable timer counter
         tim_cam.cr1.modify(|_, w| w.cen().enabled());
 

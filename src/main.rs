@@ -12,7 +12,6 @@ mod hwsiggen;
 mod system;
 mod periph;
 
-
 use crkcam::{cam::*, cam_cfg::*, crk::*, crk_cfg::*};
 use crkcam::siggen::CrkCamSigGen;
 use hwsiggen::Timer;
@@ -21,14 +20,12 @@ static mut GEN_TIM: Timer = Timer::new(36_000_000);
 
 #[interrupt]
 fn TIM2() {
-    let tim = unsafe { &mut GEN_TIM };
-    tim.set_next_crk_ev();
+    unsafe { GEN_TIM.set_next_crk_ev() };
 }
 
 #[interrupt]
 fn TIM3() {
-    let tim = unsafe { &mut GEN_TIM };
-    tim.set_next_cam_ev();
+    unsafe { GEN_TIM.set_next_cam_ev() };
 }
 
 #[entry]
@@ -37,13 +34,11 @@ fn main() -> ! {
     
     let tim = unsafe { &mut GEN_TIM };
     {
-        let mut crk_gen: CrkSigGen = CrkSigGen::new();
-        let mut cam_gen: CamSigGen = CamSigGen::new();
-        crk_gen.set_crk(&CRK_CONFIGS[0]);
-        cam_gen.set_cam(&CAM_CONFIGS[0]);
+        let crk_gen: CrkSigGen = CrkSigGen::new(&CRK_CONFIGS[0]);
+        let cam_gen: CamSigGen = CamSigGen::new(&CAM_CONFIGS[0]);
         
         tim.initialize(cam_gen, crk_gen);
-        tim.set_speed_rpm(1000);
+        tim.set_speed_rpm(3000);
         tim.start();
     }
 
