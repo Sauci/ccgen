@@ -21,10 +21,6 @@ static mut GEN_TIM: Timer = Timer::new(36_000_000);
 #[interrupt]
 fn TIM2() {
     unsafe { GEN_TIM.set_next_crk_ev() };
-}
-
-#[interrupt]
-fn TIM3() {
     unsafe { GEN_TIM.set_next_cam_ev() };
 }
 
@@ -32,13 +28,13 @@ fn TIM3() {
 fn main() -> ! {
     system::init_clks();
     
-    let tim = unsafe { &mut GEN_TIM };
     {
+        let tim = unsafe { &mut GEN_TIM };
         let crk_gen: CrkSigGen = CrkSigGen::new(&CRK_CONFIGS[0]);
         let cam_gen: CamSigGen = CamSigGen::new(&CAM_CONFIGS[0]);
         
         tim.initialize(cam_gen, crk_gen);
-        tim.set_speed_rpm(3000);
+        tim.set_speed_rpm(500);
         tim.start();
     }
 
