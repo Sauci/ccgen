@@ -15,8 +15,8 @@ pub struct Timer {
     cam: Option<CamSigGen>,
     crk: Option<CrkSigGen>,
     prescaler: u16,
-    cam_arr: u16,
-    crk_arr: u16,
+    cam_nxt_ev: u16,
+    crk_nxt_ev: u16,
     ///Generation speed, RPM
     speed: u32,
     ///Timer clock frequency, Hz
@@ -29,8 +29,8 @@ impl Timer {
             cam: None,
             crk: None,
             prescaler: 1,
-            cam_arr: 0xFFFF,
-            crk_arr: 0xFFFF,
+            cam_nxt_ev: 0,
+            crk_nxt_ev: 0,
             speed: 0,
             freq,
         }
@@ -43,53 +43,41 @@ fn clr_ti_irq_flg(tim: &stm32f1::stm32f103::tim2::RegisterBlock) {
 
 fn init_timer(tim: &stm32f1::stm32f103::tim2::RegisterBlock) {
     tim.cr1.modify(|_, w| {
-        w.ckd()
-            .div1()
-            .arpe()
-            .disabled()
-            .cms()
-            .edge_aligned()
-            .dir()
-            .up()
-            .opm()
-            .disabled()
-            .urs()
-            .counter_only()
-            .udis()
-            .disabled()
+        w.ckd().div1()
+            .arpe().disabled()
+            .cms().edge_aligned()
+            .dir().up()
+            .opm().disabled()
+            .urs().any_event()
+            .udis().enabled()
     });
 
     tim.ccmr1_output_mut().modify(|_, w| {
-        w.cc1s()
-            .output()
-            .cc2s()
-            .output()
-            .oc1pe()
-            .disabled()
-            .oc2pe()
-            .disabled()
+        w.cc1s().output()
+        .cc2s().output()
+        .oc1pe().disabled()
+        .oc2pe().disabled()
     });
 
     tim.ccer.modify(|_, w| {
-        w.cc1e()
-            .set_bit() // output capture enabled
-            .cc2e()
-            .set_bit()
-            .cc1p()
-            .clear_bit() // active high
-            .cc2p()
-            .clear_bit()
+        w.cc1e().set_bit() // output capture enabled
+        .cc2e().set_bit()
+        .cc1p().clear_bit() // active high
+        .cc2p().clear_bit()
     });
 
     tim.arr.write(|w| w.arr().bits(CRK_CAM_AUTORELOAD as u16));
     tim.dier.modify(
         |_, w| {
             w.cc1ie()
-                .enabled() // enable interrupt on output compare channel 1
-                .cc2ie()
-                .enabled()
-        }, // enable inpurrupt on output compare channel 2
+             .enabled() // enable interrupt on output compare channel 1
+             .cc2ie()   // enable inpurrupt on output compare channel 2
+             .enabled()
+        }, 
     );
+
+    let dbg = periph!(DBGMCU);
+    dbg.cr.modify(|_, w| w.dbg_tim2_stop().set_bit());
 }
 
 fn init_gpio() {
@@ -159,35 +147,29 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         if tim.sr.read().cc1if().bit_is_clear() {
             return;
         } else {
-            tim.sr.modify(|_, w| w.cc1if().clear());
-        }
-
-        // Get current timer counter value
-        let cnt = tim.cnt.read().bits();
-
-        // Get event from the cam list
-        let ev_ag = self.crk.as_mut().unwrap().next().unwrap();
-
-        // Update structure for debug purpose
-        self.crk_arr = ev_ag.ag as u16;
-
-        let next_ev = wrapping_add(cnt, self.crk_arr as u32, CRK_CAM_AUTORELOAD) as u16;
-
-        // Set the next event timing
-        tim.ccr1.write(|w| w.ccr().bits(next_ev));
-
-        // Program next output state, to be set on event
-        if ev_ag.is_gen {
-            match ev_ag.edge {
-                Edge::Rising => tim
-                    .ccmr1_output()
-                    .modify(|_, w| w.oc1m().active_on_match()),
-                Edge::Falling => tim
-                    .ccmr1_output()
-                    .modify(|_, w| w.oc1m().inactive_on_match()),
+            // Get event from the cam list
+            let ev_ag = self.crk.as_mut().unwrap().next().unwrap();
+    
+            // Compute next event, addition of last event angle with current, wrapping around 360deg
+            self.crk_nxt_ev = wrapping_add(ev_ag.ag, self.crk_nxt_ev as u32, CRK_CAM_AUTORELOAD) as u16;
+    
+            // Set the next event timing
+            tim.ccr1.write(|w| w.ccr().bits(self.crk_nxt_ev));
+            // Program next output state, to be set on event
+            if ev_ag.is_gen {
+                match ev_ag.edge {
+                    Edge::Rising => tim
+                        .ccmr1_output_mut()
+                        .modify(|_, w| w.oc1m().active_on_match()),
+                    Edge::Falling => tim
+                        .ccmr1_output_mut()
+                        .modify(|_, w| w.oc1m().inactive_on_match()),
+                }
+            } else {
+                tim.ccmr1_output().modify(|_, w| w.oc1m().frozen());
             }
-        } else {
-            tim.ccmr1_output().modify(|_, w| w.oc1m().frozen());
+
+            tim.sr.modify(|_, w| w.cc1if().clear());
         }
     }
 
@@ -199,44 +181,36 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         if tim.sr.read().cc2if().bit_is_clear() {
             return;
         } else {
+            // Get event from the cam list
+            let ev_ag = self.cam.as_mut().unwrap().next().unwrap();
+    
+            // Update structure for debug purpose
+            self.cam_nxt_ev = wrapping_add(ev_ag.ag, self.cam_nxt_ev as u32, CRK_CAM_AUTORELOAD) as u16;
+    
+            // Set the next event timing
+            tim.ccr2.write(|w| w.ccr().bits(self.cam_nxt_ev));
+    
+            // Program next output state, to be set on event
+            match ev_ag.edge {
+                Edge::Rising => tim
+                    .ccmr1_output_mut()
+                    .modify(|_, w| w.oc2m().active_on_match()),
+                Edge::Falling => tim
+                    .ccmr1_output_mut()
+                    .modify(|_, w| w.oc2m().inactive_on_match()),
+            }
             tim.sr.modify(|_, w| w.cc2if().clear());
-        }
-        // Get current timer counter value
-        let cnt = tim.cnt.read().bits();
-
-        // Get event from the cam list
-        let ev_ag = self.cam.as_mut().unwrap().next().unwrap();
-
-        // Update structure for debug purpose
-        self.cam_arr = ev_ag.ag as u16;
-
-        let next_ev = wrapping_add(cnt, self.cam_arr as u32, CRK_CAM_AUTORELOAD) as u16;
-
-        // Set the next event timing
-        tim.ccr2.write(|w| w.ccr().bits(next_ev));
-
-        // if this is the cam event 0, reset on crank
-        if ev_ag.id == 0 {
-            tim.cnt.write(|w| w.cnt().bits(0));
-            self.crk.as_mut().unwrap().reset();
-        }
-
-        // Program next output state, to be set on event
-        match ev_ag.edge {
-            Edge::Rising => tim
-                .ccmr1_output()
-                .modify(|_, w| w.oc2m().active_on_match()),
-            Edge::Falling => tim
-                .ccmr1_output()
-                .modify(|_, w| w.oc2m().inactive_on_match()),
         }
     }
 
-    fn start(&self) {
+    fn start(&mut self) {
         let tim = periph!(TIM2);
 
         // enable update event on timers
         // enable counter
+        tim.cnt.write(|w| unsafe{w.bits(0)});
+        self.set_next_cam_ev();
+        self.set_next_crk_ev();
         tim.cr1.modify(|_, w| w.cen().enabled());
     }
 }

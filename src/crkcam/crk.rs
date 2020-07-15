@@ -90,7 +90,7 @@ impl Iterator for CrkSigGen {
     fn next(&mut self) -> Option<Self::Item> {
         let ev = self.crk.ev[self.gen_pos];
         self.gen_pos += 1;
-        if self.gen_pos >= ((self.crk.teeth_nr() * 2) - 2) as usize {
+        if self.gen_pos >= (self.crk.teeth_nr() * 2) as usize {
             self.gen_pos = 0;
         }
         Some(ev)

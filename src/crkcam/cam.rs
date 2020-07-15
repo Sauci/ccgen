@@ -17,8 +17,7 @@ use heapless::Vec;
 /// The configuration shown above isn't real, only example purpose.
 pub struct CamCfg {
     pub ev_nr: usize,
-    pub mai_edge: Edge,
-    pub ev_ag: [u32; 21],
+    pub ev_ag: [(u32, Edge); 21],
 }
 
 pub struct CamWheel {
@@ -36,14 +35,8 @@ impl CamWheel {
         cam.cfg.ev_ag.iter().enumerate().for_each(|(idx, ag)| {
             let ev = AgEv {
                 id: idx as u8,
-                ag: *ag,
-                edge: {
-                    if idx % 2 == 0 {
-                        !cam.cfg.mai_edge
-                    } else {
-                        cam.cfg.mai_edge
-                    }
-                },
+                ag: ag.0,
+                edge: ag.1,
                 is_gen: true,
             };
             cam.ev

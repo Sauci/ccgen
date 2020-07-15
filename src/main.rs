@@ -34,7 +34,7 @@ fn main() -> ! {
         let cam_gen: CamSigGen = CamSigGen::new(&CAM_CONFIGS[0]);
         
         tim.initialize(cam_gen, crk_gen);
-        tim.set_speed_rpm(500);
+        tim.set_speed_rpm(3000);
         tim.start();
     }
 
