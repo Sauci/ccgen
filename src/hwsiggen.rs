@@ -1,8 +1,9 @@
-use super::crkcam::cmn::Edge;
+use super::crkcam::cmn::{Edge, Event};
 use super::crkcam::{self, cam::*, crk::*};
 use super::periph;
 
-const CRK_CAM_AUTORELOAD: u32 = 36_000;
+const CRK_CAM_AUTORELOAD: u32 = 0xFFFF;
+const NR_OF_DEG_TICKS: u32 = 3_600;
 const TIM_MIN_FROM_S: u32 = 60;
 
 use stm32f1::stm32f103::interrupt;
@@ -14,9 +15,11 @@ fn wrapping_add(cv: u32, a: u32, lim: u32) -> u32 {
 pub struct Timer {
     cam: Option<CamSigGen>,
     crk: Option<CrkSigGen>,
-    prescaler: u16,
+    prescaler: u32,
     cam_nxt_ev: u16,
+    cam_ev: Event,
     crk_nxt_ev: u16,
+    crk_ev: Event,
     ///Generation speed, RPM
     speed: u32,
     ///Timer clock frequency, Hz
@@ -30,15 +33,13 @@ impl Timer {
             crk: None,
             prescaler: 1,
             cam_nxt_ev: 0,
+            cam_ev: Event::new(),
             crk_nxt_ev: 0,
+            crk_ev: Event::new(),
             speed: 0,
             freq,
         }
     }
-}
-
-fn clr_ti_irq_flg(tim: &stm32f1::stm32f103::tim2::RegisterBlock) {
-    tim.sr.write(|w| w.uif().clear());
 }
 
 fn init_timer(tim: &stm32f1::stm32f103::tim2::RegisterBlock) {
@@ -102,6 +103,7 @@ fn init_gpio() {
 fn set_tim_psc(tim: &stm32f1::stm32f103::tim2::RegisterBlock, psc: u16) {
     tim.cr1.modify(|_, w| w.cen().disabled());
     tim.psc.write(|w| w.psc().bits(psc));
+    tim.egr.write(|w| w.ug().set_bit());
     tim.cr1.modify(|_, w| w.cen().enabled());
 }
 
@@ -129,14 +131,17 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
     fn set_speed_rpm(&mut self, spd: u32) {
         let tim = periph!(TIM2);
 
+        // Check speed to be at least 0 to avoid division by 0.
         self.speed = if spd > 0 { spd } else { 1 };
-        let psc = (TIM_MIN_FROM_S * 2 * (self.freq / CRK_CAM_AUTORELOAD) / self.speed) - 1;
-        self.prescaler = if psc > 0xFFFF {
-            0xFFFF as u16
+
+        // Compute prescaler
+        self.prescaler = TIM_MIN_FROM_S * 2 * (self.freq / NR_OF_DEG_TICKS) / self.speed;
+        self.prescaler = if self.prescaler > 0xFFFF {
+            0xFFFF
         } else {
-            psc as u16
+            self.prescaler
         };
-        set_tim_psc(tim, self.prescaler);
+        set_tim_psc(tim, self.prescaler as u16 - 1);
     }
 
     fn set_next_crk_ev(&mut self) {
@@ -148,16 +153,14 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
             return;
         } else {
             // Get event from the cam list
-            let ev_ag = self.crk.as_mut().unwrap().next().unwrap();
-    
+            self.crk_ev = self.crk.as_mut().unwrap().next().unwrap();
             // Compute next event, addition of last event angle with current, wrapping around 360deg
-            self.crk_nxt_ev = wrapping_add(ev_ag.ag, self.crk_nxt_ev as u32, CRK_CAM_AUTORELOAD) as u16;
-    
+            self.crk_nxt_ev = wrapping_add(self.crk_ev.ag, self.crk_nxt_ev as u32, CRK_CAM_AUTORELOAD) as u16;
             // Set the next event timing
             tim.ccr1.write(|w| w.ccr().bits(self.crk_nxt_ev));
             // Program next output state, to be set on event
-            if ev_ag.is_gen {
-                match ev_ag.edge {
+            if self.crk_ev.is_gen {
+                match self.crk_ev.edge {
                     Edge::Rising => tim
                         .ccmr1_output_mut()
                         .modify(|_, w| w.oc1m().active_on_match()),
@@ -182,16 +185,15 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
             return;
         } else {
             // Get event from the cam list
-            let ev_ag = self.cam.as_mut().unwrap().next().unwrap();
-    
+            self.cam_ev = self.cam.as_mut().unwrap().next().unwrap();
             // Update structure for debug purpose
-            self.cam_nxt_ev = wrapping_add(ev_ag.ag, self.cam_nxt_ev as u32, CRK_CAM_AUTORELOAD) as u16;
+            self.cam_nxt_ev = wrapping_add(self.cam_ev.ag, self.cam_nxt_ev as u32, CRK_CAM_AUTORELOAD) as u16;
     
             // Set the next event timing
             tim.ccr2.write(|w| w.ccr().bits(self.cam_nxt_ev));
     
             // Program next output state, to be set on event
-            match ev_ag.edge {
+            match self.cam_ev.edge {
                 Edge::Rising => tim
                     .ccmr1_output_mut()
                     .modify(|_, w| w.oc2m().active_on_match()),

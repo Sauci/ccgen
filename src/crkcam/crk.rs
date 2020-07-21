@@ -24,7 +24,7 @@ impl CrkCfg {
 
 #[derive(Debug)]
 pub struct CrkWheel {
-    pub ev: Vec<AgEv, U240>,
+    pub ev: Vec<Event, U240>,
     pub cfg: &'static CrkCfg,
 }
 
@@ -35,7 +35,7 @@ impl CrkWheel {
             cfg,
         };
 
-        let tmp_tooth_ag = REV_ANGLE / crk.cfg.tooth_nr as u32;
+        let tmp_tooth_ag = REV_DEG_TICKS / crk.cfg.tooth_nr as u32;
         for idx in 0..(crk.cfg.tooth_nr * 2) {
             crk.ev.push({
                 let angle = tmp_tooth_ag / 2;
@@ -49,7 +49,7 @@ impl CrkWheel {
                 } else {
                     !crk.cfg.mai_edge
                 };
-                AgEv {
+                Event {
                     id: idx,
                     ag: angle,
                     edge,
@@ -78,14 +78,10 @@ impl CrkSigGen {
             crk: CrkWheel::new(cfg),
         }
     }
-
-    pub fn reset(&mut self) {
-        self.gen_pos = 0;
-    }
 }
 
 impl Iterator for CrkSigGen {
-    type Item = AgEv;
+    type Item = Event;
 
     fn next(&mut self) -> Option<Self::Item> {
         let ev = self.crk.ev[self.gen_pos];

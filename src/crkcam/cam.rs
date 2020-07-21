@@ -21,7 +21,7 @@ pub struct CamCfg {
 }
 
 pub struct CamWheel {
-    pub ev: Vec<AgEv, U21>,
+    pub ev: Vec<Event, U21>,
     pub cfg: &'static CamCfg,
 }
 
@@ -33,7 +33,7 @@ impl CamWheel {
         };
 
         cam.cfg.ev_ag.iter().enumerate().for_each(|(idx, ag)| {
-            let ev = AgEv {
+            let ev = Event {
                 id: idx as u8,
                 ag: ag.0,
                 edge: ag.1,
@@ -62,7 +62,7 @@ impl CamSigGen {
 }
 
 impl Iterator for CamSigGen {
-    type Item = AgEv;
+    type Item = Event;
 
     fn next(&mut self) -> Option<Self::Item> {
         let ev = self.cam.ev[self.gen_pos];
