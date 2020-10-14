@@ -101,10 +101,7 @@ fn init_gpio() {
 }
 
 fn set_tim_psc(tim: &stm32f1::stm32f103::tim2::RegisterBlock, psc: u16) {
-    tim.cr1.modify(|_, w| w.cen().disabled());
-    tim.psc.write(|w| w.psc().bits(psc));
-    tim.egr.write(|w| w.ug().set_bit());
-    tim.cr1.modify(|_, w| w.cen().enabled());
+    
 }
 
 impl crkcam::siggen::CrkCamSigGen for Timer {
@@ -141,7 +138,10 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
         } else {
             self.prescaler
         };
-        set_tim_psc(tim, self.prescaler as u16 - 1);
+
+        tim.psc.write(|w| w.psc().bits(self.prescaler as u16 - 1));
+        tim.egr.write(|w| w.ug().set_bit());
+        self.start();
     }
 
     fn set_next_crk_ev(&mut self) {
@@ -207,12 +207,47 @@ impl crkcam::siggen::CrkCamSigGen for Timer {
 
     fn start(&mut self) {
         let tim = periph!(TIM2);
-
-        // enable update event on timers
-        // enable counter
         tim.cnt.write(|w| unsafe{w.bits(0)});
-        self.set_next_cam_ev();
-        self.set_next_crk_ev();
+        {
+            // Get event from the crk list
+            self.crk_ev = self.crk.as_mut().unwrap().next().unwrap();
+            // Compute next event, addition of last event angle with current, wrapping around 360deg
+            self.crk_nxt_ev = wrapping_add(self.crk_ev.ag, self.crk_nxt_ev as u32, CRK_CAM_AUTORELOAD) as u16;
+            // Set the next event timing
+            tim.ccr1.write(|w| w.ccr().bits(self.crk_nxt_ev));
+            // Program next output state, to be set on event
+            if self.crk_ev.is_gen {
+                match self.crk_ev.edge {
+                    Edge::Rising => tim
+                        .ccmr1_output_mut()
+                        .modify(|_, w| w.oc1m().active_on_match()),
+                    Edge::Falling => tim
+                        .ccmr1_output_mut()
+                        .modify(|_, w| w.oc1m().inactive_on_match()),
+                }
+            } else {
+                tim.ccmr1_output().modify(|_, w| w.oc1m().frozen());
+            }
+        }
+        {
+            // Get event from the cam list
+            self.cam_ev = self.cam.as_mut().unwrap().next().unwrap();
+            // Update structure for debug purpose
+            self.cam_nxt_ev = wrapping_add(self.cam_ev.ag, self.cam_nxt_ev as u32, CRK_CAM_AUTORELOAD) as u16;
+    
+            // Set the next event timing
+            tim.ccr2.write(|w| w.ccr().bits(self.cam_nxt_ev));
+    
+            // Program next output state, to be set on event
+            match self.cam_ev.edge {
+                Edge::Rising => tim
+                    .ccmr1_output_mut()
+                    .modify(|_, w| w.oc2m().active_on_match()),
+                Edge::Falling => tim
+                    .ccmr1_output_mut()
+                    .modify(|_, w| w.oc2m().inactive_on_match()),
+            }
+        }
         tim.cr1.modify(|_, w| w.cen().enabled());
     }
 }
