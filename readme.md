@@ -34,36 +34,30 @@ Crank/cam signal generation
     2. 6+4
 2. ccgen shall be able to generate cam signals with inverted polarities
 
-## Communication protocole
+# How to contribute
 
-Based on the RTT protocol. See [probe_rtt](https://docs.rs/probe-rs-rtt/0.3.0/probe_rs_rtt/) for host side and 
-[rtt_target](https://docs.rs/rtt-target/0.2.0/rtt_target/) for target side implementation.
+## Requirements
+* **Rust** : 
+  * follow intruction for installation [here](https://www.rust-lang.org/tools/install).
+  * To install required toolchain : `rustup target add thumbv7m-none-eabi` for cortex-m3 development
+  * To install sources for auto-completion : `rustup component add rust-src`
+* **Openocd**
+* **arm-none-eabi** toolchain: rust depends on arm-non-eabi-gcc in order to link the target executable. A version shall be accessible from the path.
+* **arm-none-eabi-gdb**: must also be in the path
+* Editing:
+  * **VSCode** : install extension *rust-analyzer* + *Cortex-Debug*
+  * **Intellij** : install the rust plugin
+* **Git**
 
-### Crank types
+## Compile/run a project
 
-Config. number | Crank type
-:--- | :---
-0 | 120-2
-1 | 120-1
-2 | 60-2
-3 | 60-1
-4 | 30-2
-5 | 30-1
-6 | 120-2, inv.
-7 | 120-1, inv.
-8 | 60-2, inv.
-9 | 60-1, inv.
-10 | 30-2, inv.
-11 | 30-1, inv.
+Pull the project, `cd` to its root and type `cargo build`. This command will fetch all the dependencies and then compiled them as well as the project. In order to flash it, two possibilities:
+* launch `openocd` (may require administrative rights depending on the user privileges) in a first terminal, and then `cargo run` in a second one to flash and launch GDB.
+* Press *F5* in VSCode (only works with *Cortex-Debug* installed and arm-none-eabi-gdb in the path)
 
-### Cam wheel types
+## Learning resources/documentation
 
-Config. number | Cam type
-:--- | :---
-0 | 6+4
-1 | 6+1
-2 | 6+4, inv.
-3 | 6+1, inv.
-
-
-
+* [Rust book](https://doc.rust-lang.org/book/)
+* [svd2rust documentation (register interface definition + api)](https://docs.rs/svd2rust/0.17.0/svd2rust/)
+* [STM32F103 reference manual](http://www.st.com/resource/en/reference_manual/cd00171190.pdf)
+* [STM32F103 datasheet](http://www.st.com/content/ccc/resource/technical/document/datasheet/33/d4/6f/1d/df/0b/4c/6d/CD00161566.pdf/files/CD00161566.pdf/jcr:content/translations/en.CD00161566.pdf)
