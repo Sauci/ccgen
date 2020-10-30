@@ -45,5 +45,13 @@ fn main() -> ! {
     tim.set_speed_rpm(speed);
     tim.start();
     
-    loop { }
+    let mut buf = [0; 32];
+    loop {
+        match com::read_data(&mut buf) {
+            Ok(len) => {
+                com::send_data(&buf[0..len]).unwrap();
+            },
+            Err(()) => (),
+        }
+    }
 }
