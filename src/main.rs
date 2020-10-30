@@ -11,7 +11,6 @@ mod com;
 
 use cortex_m_rt::entry;
 use stm32f1::stm32f103::interrupt;
-use cortex_m::asm;
 
 use crkcam::{
     cam::*, 
@@ -34,9 +33,9 @@ fn TIM2() {
 fn main() -> ! {
     system::init_clks();
 
-    let mut speed = 1000;
-    let mut cam_cfg_id = 0;
-    let mut crk_cfg_id = 0;
+    let speed = 1000;
+    let cam_cfg_id = 0;
+    let crk_cfg_id = 0;
     
     let tim = unsafe { &mut GEN_TIM };
     let crk_gen: CrkSigGen = CrkSigGen::new(&CRK_CONFIGS[crk_cfg_id]);

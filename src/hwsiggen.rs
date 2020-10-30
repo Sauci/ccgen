@@ -100,10 +100,6 @@ fn init_gpio() {
     });
 }
 
-fn set_tim_psc(tim: &stm32f1::stm32f103::tim2::RegisterBlock, psc: u16) {
-    
-}
-
 impl crkcam::siggen::CrkCamSigGen for Timer {
     fn initialize(&mut self, cam: CamSigGen, crk: CrkSigGen) {
         let rcc = periph!(RCC);
