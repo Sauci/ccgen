@@ -1,147 +1,142 @@
-use rtt_target::{
-    UpChannel,
-    DownChannel,
-};
+use heapless::Vec;
+use heapless::consts::U32;
+use stm32f1::stm32f103::Interrupt;
+use cortex_m::peripheral::NVIC;
 
-pub struct Com {
-    req_spd: DownChannel,
-    ramp_ti: DownChannel,
-    req_cfg: DownChannel,
-    act_spd: UpChannel,
-    act_cfg: UpChannel,
-    old_spd: u16,
-    old_cfg: u8,
+use crate::periph;
+
+#[derive(Copy, Clone)]
+pub enum SerSts {
+    Sending,
+    Receiving,
+    Idle,
+    Error,
 }
 
-impl Com {
-    /// Creates a new `Com` communication structure to read
-    /// information from the host.
-    pub fn new() -> Com {
-        let ch = rtt_target::rtt_init! {
-            up: {
-                0: {
-                    size: 2
-                    mode: NoBlockSkip
-                    name: "ActSpd"
-                }
-                1: {
-                    size: 1
-                    mode: NoBlockSkip
-                    name: "ActCfg"
-                }
-            }
-            down: {
-                0: {
-                    size: 2
-                    mode: NoBlockSkip
-                    name: "ReqSpd"
-                }
-                1: {
-                    size: 2
-                    mode: NoBlockSkip
-                    name: "RmpTi"
-                }
-                2: {
-                    size: 1
-                    mode: NoBlockSkip
-                    name: "ReqCfg"
-                }
-            }
+struct SerRwBuf {
+    wr_buf: Vec<u8, U32>,
+    rd_buf: Vec<u8, U32>,
+    status: SerSts,
+    recv_nr: usize,
+}
+
+static mut BUF: SerRwBuf = SerRwBuf {
+    wr_buf : Vec(heapless::i::Vec::new()),
+    rd_buf : Vec(heapless::i::Vec::new()),
+    status : SerSts::Idle,
+    recv_nr: 0,
+};
+
+pub fn init() {
+    let rcc = periph!(RCC);
+    let pa = periph!(GPIOA);
+    let ser = periph!(USART2);
+
+    // Enable clocks for peripherals
+    rcc.apb2enr.modify(|_, w| w.iopaen().enabled());
+    rcc.apb1enr.modify(|_, w| w.usart2en().enabled());
+
+    // Configure port according to P.166/167 reference manual for USART configuration
+    // 
+    pa.crl.modify(|_, w| w
+        // GPIOA2: TX -> alternative push-pull
+        .mode2().output()
+        .cnf2().alt_push_pull()
+        // GPIOA3: RX -> input floating (open_drain)
+        .mode3().input()
+        .cnf3().open_drain()
+    );
+
+    // Configuration:
+    // 8-bit frame
+    // 1 stop bit
+    // 115200 bps -> 39.0625 = fck / (16 * Baudrate) = 72e6 / (16 * 115200)
+
+    ser.cr1.modify(|_, w| w
+        .m().m8()               // 8-bit length
+        .te().enabled()         // transmission enabled
+        .re().enabled()         // reception enabled
+        .txeie().enabled()      // interrupt on tx register empty enabled
+        .rxneie().enabled()     // interrupt on rx register not empty enabled
+    );
+
+    ser.cr2.modify(|_, w| w
+        .stop().stop1()       // stop 1 bit
+    );
+
+    ser.brr.write(|w| w
+        .div_mantissa().bits(39)    
+        .div_fraction().bits(1)     // 0.0625 * 16 = 1
+    );
+
+    // Configure NVIC
+    unsafe {
+        NVIC::unmask(Interrupt::USART2);
+    }
+
+    ser.cr1.modify(|_, w| w.ue().enabled()); // start peripheral
+}
+
+pub fn read_data(dat: &mut[u8]) -> Result<usize, ()> {
+    let mut recv = 0;
+    let mut buf = unsafe { &mut BUF };
+    for d in dat.iter_mut() {
+        match buf.rd_buf.pop() {
+            Some(val) => {
+                *d = val;
+                recv += 1;
+            },
+            None => break,
         };
+    }
+    Ok(recv)
+}
 
-        Com {
-            req_spd: ch.down.0,
-            ramp_ti: ch.down.1,
-            req_cfg: ch.down.2,
-            act_spd: ch.up.0,
-            act_cfg: ch.up.1,
-            old_spd: 0,
-            old_cfg: 0,
+pub fn send_data(dat: &[u8]) -> Result<(), ()> {
+    let mut ser = periph!(USART2);
+    let mut buf = unsafe { &mut BUF };
+    for d in dat.iter() {
+        match buf.wr_buf.push(*d) {
+            Ok(()) => continue,
+            Err(_) => {
+                buf.status = SerSts::Error;
+                return Err(());
+            }
         }
     }
 
-    /// Reads a requested speed to setup
-    /// 
-    /// Arguments
-    /// * None
-    /// 
-    /// Returned
-    /// * `u16` - speed in RPM_U16_BIN0 if available
-    pub fn get_req_spd(&mut self) -> Option<u16> {
-        let mut buf = [0;2];
-        if self.req_spd.read(&mut buf) != 2 {
-            return None;
+    ser.cr1.modify(|_, w| w.txeie().enabled());
+
+    Ok(())
+}
+
+pub fn get_state() -> SerSts {
+    unsafe { BUF.status }
+}
+
+pub fn ser_handler() {
+    let usart = periph!(USART2);
+    let status = usart.sr.read().bits();
+    let mut buffer = unsafe { &mut BUF };
+
+    if usart.sr.read().txe().bits() {
+        if let Some(data) = buffer.wr_buf.pop() {
+            usart.dr.write(|w| w.dr().bits(data as u16));
         } else {
-            return Some((buf[0] as u16) << 8 + (buf[1] as u16));
+            // Disable transmission interupt if nothing to send
+            usart.cr1.modify(|_, w| w.txeie().disabled()); 
         }
     }
 
-    /// Reads a configuration identifier to setup
-    /// 
-    /// Arguments
-    /// * None
-    /// 
-    /// Returned
-    /// * `u8` - numerical identifier for a configuration
-    pub fn get_req_cfg(&mut self) -> Option<u8> {
-        let mut buf = [0;1];
-        if self.req_cfg.read(&mut buf) != 1 {
-            None
-        } else {
-            Some(buf[0])
-        }
-    }
-
-    /// Reads a ramp for the next speed change if available
-    /// 
-    /// Arguments
-    /// * None
-    /// 
-    /// Returned
-    /// * `u16` - time in MSEC_U16_BIN0 if available
-    pub fn get_ramp_ti(&mut self) -> Option<u16> {
-        let mut buf = [0; 2];
-        if self.ramp_ti.read(&mut buf) != 2 {
-            None
-        } else {
-            Some((buf[0] as u16) << 8 + (buf[1] as u16))
-        }
-    }
-
-    /// Provides currently simulated speed
-    /// 
-    /// Arguments
-    /// * `spd` - speed in RPM_U16_BIN0
-    /// 
-    /// Returned
-    /// * `Ok(())` - speed correctly written to channel
-    /// * `Err(())` - speed not written to channel
-    pub fn set_act_spd(&mut self, spd: u16) -> Result<(), ()> {
-        let mut buf = [0; 2];
-        buf[0] = (spd >> 8) as u8;
-        buf[1] = (spd & 0xFF) as u8;
-        if self.act_spd.write(&buf) != 2 {
-            Err(())
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Provides actual configuration to host
-    ///
-    /// Arguments
-    /// * `cfg` - numerical identifier of the current configuration
-    ///
-    /// Returned
-    /// * `Ok(())` - configuration correctly written to channel
-    /// * `Err(())` - configuration not written to channel
-    pub fn set_act_cfg(&mut self, cfg: u8) -> Result<(), ()> {
-        let mut buf = [0; 1];
-        buf[0] = cfg;
-        if self.act_spd.write(&buf) != 1 {
-            Err(())
-        } else {
-            Ok(())
+    if usart.sr.read().rxne().bit_is_set() {
+        match buffer.rd_buf.push(usart.dr.read().bits() as u8) {
+            Ok(()) => {
+                buffer.status = SerSts::Receiving;
+                buffer.recv_nr += 1;
+            },
+            Err(data) => {
+                buffer.status = SerSts::Error;
+            },
         }
     }
 }

@@ -32,6 +32,7 @@ fn TIM2() {
 #[entry]
 fn main() -> ! {
     system::init_clks();
+    com::init();
 
     let speed = 1000;
     let cam_cfg_id = 0;
