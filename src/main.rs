@@ -53,5 +53,8 @@ fn main() -> ! {
             },
             Err(()) => (),
         }
+        for _ in 0..10000 {
+            cortex_m::asm::nop();
+        }
     }
 }

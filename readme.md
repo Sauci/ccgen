@@ -48,6 +48,7 @@ Crank/cam signal generation
   * **VSCode** : install extension *rust-analyzer* + *Cortex-Debug*
   * **Intellij** : install the rust plugin
 * **Git**
+* Recommanded: serial terminal (ex: [Gatti](https://gitlab.com/susurrus/gattii))
 
 ## Compile/run a project
 
