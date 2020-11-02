@@ -17,32 +17,38 @@ use heapless::Vec;
 /// The configuration shown above isn't real, only example purpose.
 pub struct CamCfg {
     pub ev_nr: usize,
-    pub ev_ag: [(u32, Edge); 21],
+    pub ev_ary: [(u32, Edge); 21],
 }
 
 pub struct CamWheel {
     pub ev: Vec<Event, U21>,
-    pub cfg: &'static CamCfg,
 }
 
 impl CamWheel {
-    pub fn new(cfg: &'static CamCfg) -> CamWheel {
+
+    /// Create a camshaft wheel from a configuration of angles, edges and number of events
+    /// 
+    /// This function cannot fail as the configuration uses exactly the same number 
+    /// of events as the wheel. No check is performed on the configuration. It might be an 
+    /// impossible wheel configuration that is passed to it. 
+    pub fn new(cfg: &CamCfg) -> CamWheel {
         let mut cam = CamWheel {
             ev: Vec::new(),
-            cfg,
         };
 
-        cam.cfg.ev_ag.iter().enumerate().for_each(|(idx, ag)| {
+        for (idx, ag) in cfg.ev_ary.iter().enumerate() {
             let ev = Event {
                 id: idx as u8,
                 ag: ag.0,
                 edge: ag.1,
                 is_gen: true,
             };
-            cam.ev
-                .push(ev)
-                .expect("Too much events for camshaft configuration.");
-        });
+            match cam.ev.push(ev) {
+                Ok(()) => (),
+                Err(_) => (), 
+            };
+        }
+
         cam
     }
 }
@@ -53,11 +59,13 @@ pub struct CamSigGen {
 }
 
 impl CamSigGen {
-    pub fn new(cam: &'static CamCfg) -> CamSigGen {
-        CamSigGen {
-            gen_pos: 0,
-            cam: CamWheel::new(cam),
-        }
+    pub fn new(cam: &CamCfg) -> Result<CamSigGen, ()> {
+        Ok(
+            CamSigGen {
+                gen_pos: 0,
+                cam: CamWheel::new(cam),
+            }
+        )
     }
 }
 
@@ -67,7 +75,7 @@ impl Iterator for CamSigGen {
     fn next(&mut self) -> Option<Self::Item> {
         let ev = self.cam.ev[self.gen_pos];
         self.gen_pos += 1;
-        if self.gen_pos >= self.cam.cfg.ev_nr {
+        if self.gen_pos >= self.cam.ev.len() {
             self.gen_pos = 0;
         }
         Some(ev)

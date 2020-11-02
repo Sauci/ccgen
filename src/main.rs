@@ -39,8 +39,14 @@ fn main() -> ! {
     let crk_cfg_id = 0;
     
     let tim = unsafe { &mut GEN_TIM };
-    let crk_gen: CrkSigGen = CrkSigGen::new(&CRK_CONFIGS[crk_cfg_id]);
-    let cam_gen: CamSigGen = CamSigGen::new(&CAM_CONFIGS[cam_cfg_id]);
+    let crk_gen = CrkSigGen::new(&CRK_CONFIGS[crk_cfg_id]);
+    let cam_gen = match CamSigGen::new(&CAM_CONFIGS[cam_cfg_id]) {
+        Ok(cam_gen) => cam_gen,
+        Err(_) => {
+            com::send_data(&[0xFF, 0xFF, 0xFF]).unwrap(); 
+            panic!("Cannot create cam config.");
+        },
+    };
     tim.initialize(cam_gen, crk_gen);
     tim.set_speed_rpm(speed);
     tim.start();
