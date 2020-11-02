@@ -52,7 +52,7 @@ Crank/cam signal generation
 
 ## Compile/run a project
 
-Pull the project, `cd` to its root and type `cargo build`. This command will fetch all the dependencies and then compiled them as well as the project. In order to flash it, two possibilities:
+Pull the project, `cd` to its root and type `cargo build`. This command will fetch all the dependencies and then compile them as well as the project. In order to flash it, two possibilities:
 * launch `openocd` (may require administrative rights depending on the user privileges) in a first terminal, and then `cargo run` in a second one to flash and launch GDB.
 * Press *F5* in VSCode (only works with *Cortex-Debug* installed and arm-none-eabi-gdb in the path)
 
